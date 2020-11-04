@@ -24,7 +24,7 @@ model = PerformerLM(
     num_tokens = 20000,
     max_seq_len = 2048,             # max sequence length
     dim = 512,                      # dimension
-    depth = 6,                      # layers
+    depth = 12,                     # layers
     heads = 8,                      # heads
     causal = False,                 # auto-regressive or not
     nb_features = 256,              # number of random features, if not set, will default to (d * log(d)), where d is the dimension of each head
@@ -39,6 +39,8 @@ model = PerformerLM(
     emb_dropout = 0.1,              # embedding dropout
     ff_dropout = 0.1,               # feedforward dropout
     attn_dropout = 0.1,             # post-attn dropout
+    local_attn_heads = 4,           # 4 heads are local attention, 4 others are global performers
+    local_window_size = 256         # window size of local attention
 )
 
 x = torch.randint(0, 20000, (1, 2048))
@@ -78,6 +80,28 @@ attn = SelfAttention(
 
 x = torch.randn(1, 1024, 512).cuda()
 attn(x) # (1, 1024, 512)
+```
+
+To minimize model surgery, you could also simply rewrite the code, so that the attention step is done by the `FastAttention` module, as follows.
+
+```python
+import torch
+from performer_pytorch import FastAttention
+
+# queries / keys / values with heads already split and transposed to first dimension
+# 8 heads, dimension of head is 64, sequence length of 512
+q = torch.randn(1, 8, 512, 64)
+k = torch.randn(1, 8, 512, 64)
+v = torch.randn(1, 8, 512, 64)
+
+attn_fn = FastAttention(
+    dim_heads = 64,
+    nb_features = 256,
+    causal = False
+)
+
+out = attn_fn(q, k, v) # (1, 8, 512, 64)
+# now merge heads and combine outputs with Wo
 ```
 
 ## Advanced
@@ -147,5 +171,14 @@ Now your model will have fixed projection matrices across all layers
     author  = {Noam Shazeer},
     year    = {2020},
     url     = {https://arxiv.org/abs/2002.05202}
+}
+```
+
+```bibtex
+@misc{roy*2020efficient,
+    title   = {Efficient Content-Based Sparse Attention with Routing Transformers},
+    author  = {Aurko Roy* and Mohammad Taghi Saffar* and David Grangier and Ashish Vaswani},
+    year    = {2020},
+    url     = {https://arxiv.org/pdf/2003.05997.pdf}
 }
 ```
